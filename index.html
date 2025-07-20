@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Community Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: 
+        linear-gradient(rgba(240,248,255,0.85), rgba(240,248,255,0.85)),
+        url('https://cdn.discordapp.com/attachments/1355961175061299373/1396273127956287561/B4AQnHrSYAAAAASUVORK5CYII.png?ex=687d7c2f&is=687c2aaf&hm=4afcbce4d5144eeb867afcf6033d6f1b732398a44e9b24184ebad995d5cc7d2a&') no-repeat center center fixed;
+      background-size: cover;
+      color: #003366;
+    }
+
+    h1, h2 {
+      color: #004a99;
+      margin-bottom: 0.5rem;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    form input, form textarea {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    form button {
+      background-color: #004a99;
+      color: white;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .community-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      margin-top: 1rem;
+    }
+
+    .community-card {
+      background: #e6f2ffcc; /* slight transparency */
+      border: 1px solid #b3d1ff;
+      border-radius: 6px;
+      padding: 1rem;
+      position: relative;
+      min-height: 150px;
+      backdrop-filter: saturate(180%) blur(10px);
+    }
+
+    .community-card h4 {
+      margin-top: 0;
+      color: #004a99;
+    }
+
+    .community-card p {
+      color: #003366;
+    }
+
+    .community-card img {
+      max-width: 100%;
+      height: 100px;
+      object-fit: contain;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    #editModal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0,0,0,0.6);
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+    }
+
+    #editModal > div {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+    }
+
+    #editModal input, #editModal textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Community Section</h1>
+
+    <!-- Create Community Form -->
+    <form id="createCommunityForm">
+      <input type="text" id="communityName" placeholder="Community Name" required />
+      <textarea id="communityDescription" placeholder="Description" required></textarea>
+      <input 
+        type="url" 
+        id="communityLogo" 
+        placeholder="Logo Image URL (optional)" 
+        autocomplete="off" 
+        spellcheck="false" 
+      />
+      <input type="text" id="communityOwner" placeholder="Owner Name (e.g. @username)" required />
+      <button type="submit">Create Community</button>
+    </form>
+
+    <!-- Discover Communities Section -->
+    <section style="margin-top: 3rem;">
+      <h2>Discover Communities</h2>
+      <input 
+        type="text" 
+        id="searchCommunities" 
+        placeholder="Search Communities..." 
+        style="width: 100%; padding: 8px; margin-bottom: 1rem;" 
+      />
+      <div class="community-grid" id="community-cards"></div>
+    </section>
+  </div>
+
+  <!-- Edit Modal -->
+  <div id="editModal">
+    <div>
+      <h3>Edit Community</h3>
+      <input type="text" id="editName" placeholder="New Name" />
+      <textarea id="editDescription" placeholder="New Description"></textarea>
+      <input type="text" id="editOwner" placeholder="Owner" />
+      <input 
+        type="url" 
+        id="editLogo" 
+        placeholder="Logo URL" 
+        autocomplete="off" 
+        spellcheck="false" 
+      />
+      <div style="text-align: right;">
+        <button onclick="closeModal()">Cancel</button>
+        <button onclick="saveEdit()" style="background: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Allow paste and cut on all inputs and textareas
+    document.querySelectorAll('input, textarea').forEach(el => {
+      el.addEventListener('paste', e => {
+        // Allow paste
+      });
+      el.addEventListener('cut', e => {
+        // Allow cut
+      });
+    });
+
+    const createForm = document.getElementById('createCommunityForm');
+    const communityList = document.getElementById('community-cards');
+    const searchInput = document.getElementById('searchCommunities');
+
+    const modal = document.getElementById('editModal');
+    const editNameInput = document.getElementById('editName');
+    const editDescriptionInput = document.getElementById('editDescription');
+    const editOwnerInput = document.getElementById('editOwner');
+    const editLogoInput = document.getElementById('editLogo');
+
+    let communities = [];
+    let editingId = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      const stored = localStorage.getItem('communities');
+      if (stored) {
+        communities = JSON.parse(stored);
+        renderCommunities(communities);
+      }
+    });
+
+    createForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const name = document.getElementById('communityName').value.trim();
+      const description = document.getElementById('communityDescription').value.trim();
+      const logo = document.getElementById('communityLogo').value.trim();
+      const owner = document.getElementById('communityOwner').value.trim();
+
+      if (name === '' || description === '' || owner === '') return;
+
+      const community = {
+        id: Date.now(),
+        name,
+        description,
+        logo,
+        owner,
+      };
+
+      communities.push(community);
+      saveAndRender();
+      createForm.reset();
+      searchInput.value = ''; // reset search to show all
+    });
+
+    searchInput.addEventListener('input', function () {
+      const query = this.value.toLowerCase();
+      const filtered = communities.filter(c =>
+        c.name.toLowerCase().includes(query) || c.description.toLowerCase().includes(query)
+      );
+      renderCommunities(filtered);
+    });
+
+    function saveAndRender() {
+      localStorage.setItem('communities', JSON.stringify(communities));
+      renderCommunities(communities);
+    }
+
+    function renderCommunities(list) {
+      communityList.innerHTML = '';
+
+      if (list.length === 0) {
+        communityList.innerHTML = '<div style="grid-column: 1 / -1; text-align: center;">No communities found. Try creating one!</div>';
+        return;
+      }
+
+      list.forEach((community) => {
+        const card = document.createElement('div');
+        card.className = 'community-card';
+
+        card.innerHTML = `
+          ${community.logo ? `<img src="${community.logo}" alt="${community.name} Logo" />` : ''}
+          <h4>${community.name}</h4>
+          <p>${community.description}</p>
+          <small><strong>Owner:</strong> ${community.owner}</small>
+          <div style="margin-top: 1rem;">
+            <button onclick="editCommunity(${community.id})" style="margin-right: 0.5rem; background-color: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 4px;">Edit</button>
+            <button onclick="deleteCommunity(${community.id})" style="background-color: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 4px;">Delete</button>
+          </div>
+        `;
+        communityList.appendChild(card);
+      });
+    }
+
+    function deleteCommunity(id) {
+      communities = communities.filter(c => c.id !== id);
+      saveAndRender();
+    }
+
+    function editCommunity(id) {
+      const community = communities.find(c => c.id === id);
+      if (!community) return;
+
+      editingId = id;
+      editNameInput.value = community.name;
+      editDescriptionInput.value = community.description;
+      editOwnerInput.value = community.owner;
+      editLogoInput.value = community.logo || '';
+      modal.style.display = 'flex';
+    }
+
+    function saveEdit() {
+      const name = editNameInput.value.trim();
+      const description = editDescriptionInput.value.trim();
+      const owner = editOwnerInput.value.trim();
+      const logo = editLogoInput.value.trim();
+
+      const index = communities.findIndex(c => c.id === editingId);
+      if (index !== -1) {
+        communities[index].name = name;
+        communities[index].description = description;
+        communities[index].owner = owner;
+        communities[index].logo = logo;
+        saveAndRender();
+      }
+
+      closeModal();
+    }
+
+    function closeModal() {
+      modal.style.display = 'none';
+      editingId = null;
+    }
+
+    window.editCommunity = editCommunity;
+    window.deleteCommunity = deleteCommunity;
+    window.saveEdit = saveEdit;
+    window.closeModal = closeModal;
+  </script>
+</body>
+</html>
